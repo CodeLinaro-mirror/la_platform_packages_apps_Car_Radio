@@ -18,20 +18,23 @@ package com.android.car.radio;
 
 import android.content.Context;
 import android.graphics.drawable.GradientDrawable;
+import android.hardware.radio.ProgramSelector;
 import android.support.annotation.NonNull;
 import android.support.v7.widget.RecyclerView;
-import android.text.TextUtils;
 import android.util.Log;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.widget.ImageButton;
 import android.widget.TextView;
-import com.android.car.radio.service.RadioStation;
+
+import com.android.car.radio.media.Program;
+import com.android.car.radio.platform.ProgramSelectorExt;
 import com.android.car.view.CardListBackgroundResolver;
+
 import java.util.Objects;
 
 /**
- * A {@link RecyclerView.ViewHolder} that can bind a {@link RadioStation} to the layout
+ * A {@link RecyclerView.ViewHolder} that can bind a {@link Program} to the layout
  * {@code R.layout.radio_preset_item}.
  */
 public class PresetsViewHolder extends RecyclerView.ViewHolder implements View.OnClickListener {
@@ -96,7 +99,8 @@ public class PresetsViewHolder extends RecyclerView.ViewHolder implements View.O
         mPresetItemMetadata = presetsView.findViewById(R.id.preset_item_metadata);
         mPresetButton = presetsView.findViewById(R.id.preset_button);
 
-        mPresetItemChannelBg = (GradientDrawable) mPresetItemChannel.getBackground();
+        mPresetItemChannelBg = (GradientDrawable)
+                presetsView.findViewById(R.id.preset_station_background).getBackground();
     }
 
     @Override
@@ -109,23 +113,24 @@ public class PresetsViewHolder extends RecyclerView.ViewHolder implements View.O
     }
 
     /**
-     * Binds the given {@link RadioStation} to this View within this ViewHolder.
+     * Binds the given {@link Program} to this View within this ViewHolder.
      */
-    public void bindPreset(RadioStation preset, boolean isActiveStation, int itemCount) {
+    public void bindPreset(Program program, boolean isActiveStation, int itemCount,
+            boolean isFavorite) {
         // If the preset is null, clear any existing text.
-        if (preset == null) {
+        if (program == null) {
             mPresetItemChannel.setText(null);
             mPresetItemMetadata.setText(null);
             mPresetItemChannelBg.setColor(mColorMapper.getDefaultColor());
             return;
         }
 
+        ProgramSelector sel = program.getSelector();
+
         CardListBackgroundResolver.setBackground(mPresetsCard, getAdapterPosition(), itemCount);
 
-        String channelNumber = RadioChannelFormatter.formatRadioChannel(preset.getRadioBand(),
-                preset.getChannelNumber());
-
-        mPresetItemChannel.setText(channelNumber);
+        mPresetItemChannel.setText(ProgramSelectorExt.getDisplayName(
+                sel, ProgramSelectorExt.NAME_NO_MODULATION));
         if (isActiveStation) {
             mPresetItemChannel.setCompoundDrawablesRelativeWithIntrinsicBounds(
                     R.drawable.ic_equalizer, 0, 0, 0);
@@ -133,30 +138,33 @@ public class PresetsViewHolder extends RecyclerView.ViewHolder implements View.O
             mPresetItemChannel.setCompoundDrawablesRelativeWithIntrinsicBounds(0, 0, 0, 0);
         }
 
-        mPresetItemChannelBg.setColor(mColorMapper.getColorForStation(preset));
+        mPresetItemChannelBg.setColor(mColorMapper.getColorForProgram(sel));
 
-        String metadata = preset.getRds() == null ? null : preset.getRds().getProgramService();
-
-        if (TextUtils.isEmpty(metadata)) {
+        String programName = program.getName();
+        if (programName.isEmpty()) {
             // If there is no metadata text, then use text to indicate the favorite number to the
             // user so that list does not appear empty.
             mPresetItemMetadata.setText(mContext.getString(
                     R.string.radio_default_preset_metadata_text, getAdapterPosition() + 1));
         } else {
-            mPresetItemMetadata.setText(metadata.trim());
+            mPresetItemMetadata.setText(programName);
         }
-        mPresetButton.setTag(R.drawable.ic_star_filled);
+        setFavoriteButtonFilled(isFavorite);
         mPresetButton.setOnClickListener(v -> {
             boolean favoriteToggleOn =
                     ((Integer) mPresetButton.getTag() == R.drawable.ic_star_empty);
-            if (favoriteToggleOn) {
-                mPresetButton.setImageResource(R.drawable.ic_star_filled);
-                mPresetButton.setTag(R.drawable.ic_star_filled);
-            } else {
-                mPresetButton.setImageResource(R.drawable.ic_star_empty);
-                mPresetButton.setTag(R.drawable.ic_star_empty);
-            }
+            setFavoriteButtonFilled(favoriteToggleOn);
             mPresetFavoriteListener.onPresetFavoriteChanged(getAdapterPosition(), favoriteToggleOn);
         });
+    }
+
+    private void setFavoriteButtonFilled(boolean favoriteToggleOn) {
+        if (favoriteToggleOn) {
+            mPresetButton.setImageResource(R.drawable.ic_star_filled);
+            mPresetButton.setTag(R.drawable.ic_star_filled);
+        } else {
+            mPresetButton.setImageResource(R.drawable.ic_star_empty);
+            mPresetButton.setTag(R.drawable.ic_star_empty);
+        }
     }
 }
