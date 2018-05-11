@@ -19,7 +19,9 @@ package com.android.car.radio;
 import android.animation.Animator;
 import android.animation.AnimatorSet;
 import android.animation.ObjectAnimator;
+import android.annotation.NonNull;
 import android.content.Context;
+import android.hardware.radio.RadioManager.ProgramInfo;
 import android.os.Bundle;
 import android.support.v4.app.Fragment;
 import android.util.Log;
@@ -27,12 +29,12 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 
-import com.android.car.radio.service.RadioStation;
-
-import java.util.List;
-
 import androidx.car.widget.DayNightStyle;
 import androidx.car.widget.PagedListView;
+
+import com.android.car.radio.media.Program;
+
+import java.util.List;
 
 /**
  * A fragment that is responsible for displaying a list of the user's saved radio stations.
@@ -40,7 +42,7 @@ import androidx.car.widget.PagedListView;
 public class RadioPresetsFragment extends Fragment implements
         FragmentWithFade,
         RadioAnimationManager.OnExitCompleteListener,
-        RadioController.RadioStationChangeListener,
+        RadioController.ProgramInfoChangeListener,
         RadioStorage.PresetsChangeListener {
     private static final String TAG = "PresetsFragment";
     private static final int ANIM_DURATION_MS = 200;
@@ -86,7 +88,7 @@ public class RadioPresetsFragment extends Fragment implements
     public void onViewCreated(View view, Bundle savedInstanceState) {
         Context context = getContext();
 
-        mPresetsAdapter.setOnPresetItemClickListener(mRadioController::tuneToRadioChannel);
+        mPresetsAdapter.setOnPresetItemClickListener(mRadioController::tune);
         mPresetsAdapter.setOnPresetItemFavoriteListener(this::handlePresetItemFavoriteChanged);
 
         mCurrentRadioCard = view.findViewById(R.id.current_radio_station_card);
@@ -207,14 +209,19 @@ public class RadioPresetsFragment extends Fragment implements
         super.onStart();
         mRadioController.initialize(getView());
         mRadioController.setShouldColorStatusBar(true);
-        mRadioController.setRadioStationChangeListener(this);
+        mRadioController.setProgramInfoChangeListener(this);
 
-        mPresetsAdapter.setActiveRadioStation(mRadioController.getCurrentRadioStation());
+        // TODO(b/73950974): use callback only
+        ProgramInfo info = mRadioController.getCurrentProgramInfo();
+        if (info != null) {
+            mPresetsAdapter.setActiveProgram(Program.fromProgramInfo(info));
+        }
     }
 
     @Override
     public void onDestroy() {
         mRadioStorage.removePresetsChangeListener(this);
+        mRadioController.setProgramInfoChangeListener(null);
         mPresetListExitListener = null;
         super.onDestroy();
     }
@@ -228,12 +235,9 @@ public class RadioPresetsFragment extends Fragment implements
 
 
     @Override
-    public void onRadioStationChanged(RadioStation station) {
-        if (Log.isLoggable(TAG, Log.DEBUG)) {
-            Log.d(TAG, "onRadioStationChanged(): " + station);
-        }
-
-        mPresetsAdapter.setActiveRadioStation(station);
+    public void onProgramInfoChanged(@NonNull ProgramInfo info) {
+        mPresetsAdapter.setPresets(mRadioStorage.getPresets());
+        mPresetsAdapter.setActiveProgram(Program.fromProgramInfo(info));
     }
 
     @Override
@@ -243,26 +247,20 @@ public class RadioPresetsFragment extends Fragment implements
         }
     }
 
-    private void handlePresetItemFavoriteChanged(RadioStation radioStation, boolean saveAsFavorite) {
+    private void handlePresetItemFavoriteChanged(Program program, boolean saveAsFavorite) {
         if (saveAsFavorite) {
-            mRadioStorage.storePreset(radioStation);
+            mRadioStorage.storePreset(program);
         } else {
-            mRadioStorage.removePreset(radioStation);
+            mRadioStorage.removePreset(program.getSelector());
         }
     }
 
     /**
      * Sets the given list of presets into the PagedListView {@link #mPresetsList}.
      */
-    private void setPresetsOnList(List<RadioStation> presets) {
+    private void setPresetsOnList(List<Program> presets) {
         if (Log.isLoggable(TAG, Log.DEBUG)) {
             Log.d(TAG, "setPresetsOnList(). # of presets: " + presets.size());
-        }
-
-        if (Log.isLoggable(TAG, Log.VERBOSE)) {
-            for (RadioStation radioStation : presets) {
-                Log.v(TAG, "\t" + radioStation);
-            }
         }
 
         mPresetsAdapter.setPresets(presets);

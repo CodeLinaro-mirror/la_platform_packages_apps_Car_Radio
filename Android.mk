@@ -35,21 +35,20 @@ LOCAL_PRIVILEGED_MODULE := true
 LOCAL_USE_AAPT2 := true
 
 LOCAL_STATIC_ANDROID_LIBRARIES += \
-    $(ANDROID_SUPPORT_CAR_TARGETS)
+    android-support-car \
+    android-support-constraint-layout \
+    car-stream-ui-lib \
+    car-apps-common
+
+LOCAL_STATIC_JAVA_LIBRARIES := \
+    android-support-constraint-layout-solver
 
 LOCAL_RESOURCE_DIR := $(LOCAL_PATH)/res
-
-# Include support-v7-appcompat, if not already included
-ifeq (,$(findstring android-support-v7-appcompat,$(LOCAL_STATIC_ANDROID_LIBRARIES)))
-LOCAL_STATIC_ANDROID_LIBRARIES += android-support-v7-appcompat
-endif
 
 LOCAL_PROGUARD_ENABLED := disabled
 
 LOCAL_DEX_PREOPT := false
 
-include packages/apps/Car/libs/car-stream-ui-lib/car-stream-ui-lib.mk
-include packages/apps/Car/libs/car-apps-common/car-apps-common.mk
 include packages/services/Car/car-support-lib/car-support.mk
 
 include $(BUILD_PACKAGE)

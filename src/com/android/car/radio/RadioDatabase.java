@@ -16,16 +16,17 @@
 
 package com.android.car.radio;
 
+import android.annotation.NonNull;
+import android.annotation.WorkerThread;
 import android.content.ContentValues;
 import android.content.Context;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
 import android.os.Looper;
-import android.support.annotation.NonNull;
-import android.support.annotation.WorkerThread;
 import android.text.TextUtils;
 import android.util.Log;
+
 import com.android.car.radio.service.RadioRds;
 import com.android.car.radio.service.RadioStation;
 
@@ -202,7 +203,7 @@ public final class RadioDatabase extends SQLiteOpenHelper {
 
         ContentValues values = new ContentValues();
         values.put(RadioPresetsTable.Columns.CHANNEL_NUMBER, preset.getChannelNumber());
-        values.put(RadioPresetsTable.Columns.SUB_CHANNEL, preset.getSubChannelNumber());
+        values.put(RadioPresetsTable.Columns.SUB_CHANNEL, 0);
         values.put(RadioPresetsTable.Columns.BAND, preset.getRadioBand());
 
         if (preset.getRds() != null) {
@@ -242,7 +243,7 @@ public final class RadioDatabase extends SQLiteOpenHelper {
         db.beginTransaction();
         try {
             String channelNumber = Integer.toString(preset.getChannelNumber());
-            String subChannelNumber = Integer.toString(preset.getSubChannelNumber());
+            String subChannelNumber = "0";
 
             rowsDeleted = db.delete(RadioPresetsTable.NAME, DELETE_PRESETS_WHERE_CLAUSE,
                     new String[] { channelNumber, subChannelNumber });
@@ -339,8 +340,7 @@ public final class RadioDatabase extends SQLiteOpenHelper {
                 ContentValues values = new ContentValues();
                 values.put(PreScannedStationsTable.Columns.CHANNEL_NUMBER,
                         station.getChannelNumber());
-                values.put(PreScannedStationsTable.Columns.SUB_CHANNEL,
-                        station.getSubChannelNumber());
+                values.put(PreScannedStationsTable.Columns.SUB_CHANNEL, 0);
                 values.put(PreScannedStationsTable.Columns.BAND, station.getRadioBand());
 
                 if (station.getRds() != null) {
