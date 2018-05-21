@@ -20,10 +20,10 @@ import android.animation.Animator;
 import android.animation.AnimatorSet;
 import android.animation.ObjectAnimator;
 import android.animation.ValueAnimator;
+import android.annotation.NonNull;
 import android.content.Context;
 import android.content.res.Resources;
 import android.graphics.Point;
-import android.support.annotation.NonNull;
 import android.support.v4.view.animation.FastOutSlowInInterpolator;
 import android.support.v7.widget.CardView;
 import android.view.Display;
@@ -95,7 +95,7 @@ public class RadioAnimationManager {
         mCornerRadius = res.getDimensionPixelSize(R.dimen.car_preset_item_radius);
         mActionPanelHeight = res.getDimensionPixelSize(R.dimen.car_action_bar_height);
         mPresetFinalHeight = res.getDimensionPixelSize(R.dimen.car_preset_item_height);
-        mFabSize = res.getDimensionPixelSize(R.dimen.stream_fab_size);
+        mFabSize = res.getDimensionPixelSize(R.dimen.car_radio_controls_fab_size);
         mPresetFabSize = res.getDimensionPixelSize(R.dimen.car_presets_play_button_size);
         mPresetContainerHeight = res.getDimensionPixelSize(R.dimen.car_preset_container_height);
 

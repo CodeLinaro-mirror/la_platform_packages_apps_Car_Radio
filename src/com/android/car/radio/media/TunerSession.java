@@ -23,6 +23,7 @@ import android.hardware.radio.ProgramSelector;
 import android.hardware.radio.RadioManager.ProgramInfo;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.IBinder;
 import android.os.RemoteException;
 import android.support.v4.media.MediaMetadataCompat;
 import android.support.v4.media.RatingCompat;
@@ -30,6 +31,7 @@ import android.support.v4.media.session.MediaSessionCompat;
 import android.support.v4.media.session.PlaybackStateCompat;
 import android.util.Log;
 
+import com.android.car.radio.audio.IPlaybackStateListener;
 import com.android.car.radio.platform.ImageResolver;
 import com.android.car.radio.platform.ProgramInfoExt;
 import com.android.car.radio.platform.ProgramSelectorExt;
@@ -38,7 +40,10 @@ import com.android.car.radio.utils.ThrowingRunnable;
 
 import java.util.Objects;
 
-public class TunerSession extends MediaSessionCompat {
+/**
+ * Implementation of tuner's MediaSession.
+ */
+public class TunerSession extends MediaSessionCompat implements IPlaybackStateListener {
     private static final String TAG = "BcRadioApp.msess";
 
     private final Object mLock = new Object();
@@ -58,28 +63,20 @@ public class TunerSession extends MediaSessionCompat {
         mImageResolver = imageResolver;
         mUiSession = Objects.requireNonNull(uiSession);
 
-        // TODO(b/75970985): implement ACTION_STOP, ACTION_PAUSE, ACTION_PLAY
+        // ACTION_PAUSE is reserved for time-shifted playback
         mPlaybackStateBuilder.setActions(
-                PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS |
-                PlaybackStateCompat.ACTION_SKIP_TO_NEXT |
-                PlaybackStateCompat.ACTION_SET_RATING |
-                PlaybackStateCompat.ACTION_PLAY_FROM_MEDIA_ID |
-                PlaybackStateCompat.ACTION_PLAY_FROM_URI);
+                PlaybackStateCompat.ACTION_STOP
+                | PlaybackStateCompat.ACTION_PLAY
+                | PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS
+                | PlaybackStateCompat.ACTION_SKIP_TO_NEXT
+                | PlaybackStateCompat.ACTION_SET_RATING
+                | PlaybackStateCompat.ACTION_PLAY_FROM_MEDIA_ID
+                | PlaybackStateCompat.ACTION_PLAY_FROM_URI);
         setRatingType(RatingCompat.RATING_HEART);
+        onPlaybackStateChanged(PlaybackStateCompat.STATE_NONE);
         setCallback(new TunerSessionCallback());
 
-        // TODO(b/75970985): track playback state, don't hardcode it
-        setPlaybackState(PlaybackStateCompat.STATE_PLAYING);
-
         setActive(true);
-    }
-
-    private void setPlaybackState(int state) {
-        synchronized (mPlaybackStateBuilder) {
-            mPlaybackStateBuilder.setState(state,
-                    PlaybackStateCompat.PLAYBACK_POSITION_UNKNOWN, 1.0f);
-            setPlaybackState(mPlaybackStateBuilder.build());
-        }
     }
 
     private void updateMetadata() {
@@ -98,6 +95,15 @@ public class TunerSession extends MediaSessionCompat {
         }
     }
 
+    @Override
+    public void onPlaybackStateChanged(@PlaybackStateCompat.State int state) {
+        synchronized (mPlaybackStateBuilder) {
+            mPlaybackStateBuilder.setState(state,
+                    PlaybackStateCompat.PLAYBACK_POSITION_UNKNOWN, 1.0f);
+            setPlaybackState(mPlaybackStateBuilder.build());
+        }
+    }
+
     public void notifyFavoritesChanged() {
         updateMetadata();
     }
@@ -111,6 +117,16 @@ public class TunerSession extends MediaSessionCompat {
     }
 
     private class TunerSessionCallback extends MediaSessionCompat.Callback {
+        @Override
+        public void onStop() {
+            exec(() -> mUiSession.mute());
+        }
+
+        @Override
+        public void onPlay() {
+            exec(() -> mUiSession.unMute());
+        }
+
         @Override
         public void onSkipToNext() {
             exec(() -> mUiSession.seekForward());
@@ -154,5 +170,10 @@ public class TunerSession extends MediaSessionCompat {
                 Log.e(TAG, "Invalid URI: " + uri);
             }
         }
+    }
+
+    @Override
+    public IBinder asBinder() {
+        throw new UnsupportedOperationException("Not a binder");
     }
 }
