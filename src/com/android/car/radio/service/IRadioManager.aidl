@@ -18,7 +18,7 @@ package com.android.car.radio.service;
 import android.hardware.radio.ProgramSelector;
 import android.hardware.radio.RadioManager;
 
-import com.android.car.radio.media.Program;
+import com.android.car.broadcastradio.support.Program;
 import com.android.car.radio.service.IRadioCallback;
 
 /**
@@ -108,4 +108,9 @@ interface IRadioManager {
      * is supplying music.
      */
     boolean hasFocus();
+
+    /**
+     * Returns a list of programs found with the tuner's background scan
+     */
+    List<RadioManager.ProgramInfo> getProgramList();
 }
