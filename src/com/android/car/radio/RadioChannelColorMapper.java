@@ -16,12 +16,12 @@
 
 package com.android.car.radio;
 
+import android.annotation.ColorInt;
+import android.annotation.NonNull;
 import android.content.Context;
 import android.hardware.radio.ProgramSelector;
-import android.support.annotation.ColorInt;
-import android.support.annotation.NonNull;
 
-import com.android.car.radio.platform.ProgramSelectorExt;
+import com.android.car.broadcastradio.support.platform.ProgramSelectorExt;
 
 /**
  * A class that will take a {@link Program} and return its corresponding color. The colors

@@ -24,11 +24,11 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 
-import com.android.car.radio.media.Program;
+import androidx.car.widget.PagedListView;
+
+import com.android.car.broadcastradio.support.Program;
 
 import java.util.List;
-
-import androidx.car.widget.PagedListView;
 import java.util.Objects;
 
 /**

@@ -21,7 +21,6 @@ import android.animation.AnimatorSet;
 import android.animation.ObjectAnimator;
 import android.annotation.NonNull;
 import android.content.Context;
-import android.hardware.radio.ProgramSelector;
 import android.hardware.radio.RadioManager.ProgramInfo;
 import android.os.Bundle;
 import android.support.v4.app.Fragment;
@@ -30,12 +29,13 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 
-import com.android.car.radio.media.Program;
-
-import java.util.List;
-
 import androidx.car.widget.DayNightStyle;
 import androidx.car.widget.PagedListView;
+
+import com.android.car.broadcastradio.support.Program;
+import com.android.car.radio.storage.RadioStorage;
+
+import java.util.List;
 
 /**
  * A fragment that is responsible for displaying a list of the user's saved radio stations.
@@ -210,7 +210,7 @@ public class RadioPresetsFragment extends Fragment implements
         super.onStart();
         mRadioController.initialize(getView());
         mRadioController.setShouldColorStatusBar(true);
-        mRadioController.setProgramInfoChangeListener(this);
+        mRadioController.addProgramInfoChangeListener(this);
 
         // TODO(b/73950974): use callback only
         ProgramInfo info = mRadioController.getCurrentProgramInfo();
@@ -222,7 +222,7 @@ public class RadioPresetsFragment extends Fragment implements
     @Override
     public void onDestroy() {
         mRadioStorage.removePresetsChangeListener(this);
-        mRadioController.setProgramInfoChangeListener(null);
+        mRadioController.removeProgramInfoChangeListener(this);
         mPresetListExitListener = null;
         super.onDestroy();
     }
