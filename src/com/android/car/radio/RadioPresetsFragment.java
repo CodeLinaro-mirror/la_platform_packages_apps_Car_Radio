@@ -32,7 +32,7 @@ import android.view.ViewGroup;
 import androidx.car.widget.DayNightStyle;
 import androidx.car.widget.PagedListView;
 
-import com.android.car.radio.media.Program;
+import com.android.car.broadcastradio.support.Program;
 import com.android.car.radio.storage.RadioStorage;
 
 import java.util.List;
@@ -210,7 +210,7 @@ public class RadioPresetsFragment extends Fragment implements
         super.onStart();
         mRadioController.initialize(getView());
         mRadioController.setShouldColorStatusBar(true);
-        mRadioController.setProgramInfoChangeListener(this);
+        mRadioController.addProgramInfoChangeListener(this);
 
         // TODO(b/73950974): use callback only
         ProgramInfo info = mRadioController.getCurrentProgramInfo();
@@ -222,7 +222,7 @@ public class RadioPresetsFragment extends Fragment implements
     @Override
     public void onDestroy() {
         mRadioStorage.removePresetsChangeListener(this);
-        mRadioController.setProgramInfoChangeListener(null);
+        mRadioController.removeProgramInfoChangeListener(this);
         mPresetListExitListener = null;
         super.onDestroy();
     }

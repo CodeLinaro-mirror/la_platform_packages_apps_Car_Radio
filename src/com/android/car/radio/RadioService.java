@@ -17,25 +17,25 @@
 package com.android.car.radio;
 
 import android.app.Service;
-import android.content.Context;
 import android.content.Intent;
 import android.hardware.radio.ProgramList;
 import android.hardware.radio.ProgramSelector;
 import android.hardware.radio.RadioManager;
 import android.hardware.radio.RadioManager.ProgramInfo;
 import android.hardware.radio.RadioTuner;
-import android.media.AudioAttributes;
-import android.media.AudioManager;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.RemoteException;
 import android.support.v4.media.MediaBrowserCompat.MediaItem;
 import android.support.v4.media.MediaBrowserServiceCompat;
+import android.support.v4.media.session.PlaybackStateCompat;
 import android.util.Log;
 
-import com.android.car.radio.media.BrowseTree;
-import com.android.car.radio.media.Program;
+import com.android.car.broadcastradio.support.Program;
+import com.android.car.broadcastradio.support.media.BrowseTree;
+import com.android.car.radio.audio.AudioStreamController;
+import com.android.car.radio.audio.IPlaybackStateListener;
 import com.android.car.radio.media.TunerSession;
 import com.android.car.radio.platform.ImageMemoryCache;
 import com.android.car.radio.platform.RadioManagerExt;
@@ -47,6 +47,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
 /**
  * A persistent {@link Service} that is responsible for opening and closing a {@link RadioTuner}.
@@ -55,8 +56,7 @@ import java.util.Objects;
  *
  * <p>Utilize the {@link RadioBinder} to perform radio operations.
  */
-public class RadioService extends MediaBrowserServiceCompat
-        implements AudioManager.OnAudioFocusChangeListener {
+public class RadioService extends MediaBrowserServiceCompat implements IPlaybackStateListener {
 
     private static String TAG = "BcRadioApp.uisrv";
 
@@ -85,8 +85,7 @@ public class RadioService extends MediaBrowserServiceCompat
     private RadioManagerExt mRadioManager;
     private ImageMemoryCache mImageCache;
 
-    private AudioManager mAudioManager;
-    private AudioAttributes mRadioAudioAttributes;
+    private AudioStreamController mAudioStreamController;
 
     private BrowseTree mBrowseTree;
     private TunerSession mMediaSession;
@@ -124,25 +123,23 @@ public class RadioService extends MediaBrowserServiceCompat
             Log.d(TAG, "onCreate()");
         }
 
-        mRadioStorage = RadioStorage.getInstance(this);
-
-        mAudioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
-        mRadioAudioAttributes = new AudioAttributes.Builder()
-                .setUsage(AudioAttributes.USAGE_MEDIA)
-                .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
-                .build();
-
         mRadioManager = new RadioManagerExt(this);
+        mAudioStreamController = new AudioStreamController(this, mRadioManager);
+        mRadioStorage = RadioStorage.getInstance(this);
         mImageCache = new ImageMemoryCache(mRadioManager, 1000);
+
         mBrowseTree = new BrowseTree(this, mImageCache);
         mMediaSession = new TunerSession(this, mBrowseTree, mBinder, mImageCache);
         setSessionToken(mMediaSession.getSessionToken());
-
+        mAudioStreamController.addPlaybackStateListener(mMediaSession);
         mBrowseTree.setAmFmRegionConfig(mRadioManager.getAmFmRegionConfig());
-        openRadioBandInternal(mCurrentRadioBand);
 
         mRadioStorage.addPresetsChangeListener(mPresetsListener);
         onPresetsChanged();
+
+        mAudioStreamController.addPlaybackStateListener(this);
+
+        openRadioBandInternal(mCurrentRadioBand);
 
         mRadioSuccessfullyInitialized = true;
     }
@@ -177,10 +174,7 @@ public class RadioService extends MediaBrowserServiceCompat
      * {@link RadioManager#STATUS_ERROR}.
      */
     private int openRadioBandInternal(int radioBand) {
-        if (requestAudioFocus() != AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
-            Log.e(TAG, "openRadioBandInternal() audio focus request fail");
-            return RadioManager.STATUS_ERROR;
-        }
+        if (!mAudioStreamController.requestMuted(false)) return RadioManager.STATUS_ERROR;
 
         mCurrentRadioBand = radioBand;
         if (mRadioTuner == null) {
@@ -200,46 +194,19 @@ public class RadioService extends MediaBrowserServiceCompat
         return RadioManager.STATUS_OK;
     }
 
-    private int requestAudioFocus() {
-        int status = mAudioManager.requestAudioFocus(this, mRadioAudioAttributes,
-                    AudioManager.AUDIOFOCUS_GAIN, 0);
-
-        if (Log.isLoggable(TAG, Log.DEBUG)) {
-            Log.d(TAG, "requestAudioFocus status: " + status);
-        }
-
-        if (status == AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
-            mHasAudioFocus = true;
-
-            mRadioManager.getRadioTunerExt().setMuted(false);
-
+    /* TODO(b/73950974): remove onRadioMuteChanged from IRadioCallback,
+     * use IPlaybackStateListener directly.
+     */
+    @Override
+    public void onPlaybackStateChanged(@PlaybackStateCompat.State int state) {
+        boolean muted = state != PlaybackStateCompat.STATE_PLAYING;
+        synchronized (mLock) {
             for (IRadioCallback callback : mRadioTunerCallbacks) {
                 try {
-                    callback.onRadioMuteChanged(false);
+                    callback.onRadioMuteChanged(muted);
                 } catch (RemoteException e) {
-                    Log.e(TAG, "requestAudioFocus(); onRadioMuteChanged() notify failed: "
-                            + e.getMessage());
+                    Log.e(TAG, "Mute state change callback failed", e);
                 }
-            }
-        }
-
-        return status;
-    }
-
-    private void abandonAudioFocus() {
-        if (Log.isLoggable(TAG, Log.DEBUG)) {
-            Log.d(TAG, "abandonAudioFocus()");
-        }
-
-        mAudioManager.abandonAudioFocus(this, mRadioAudioAttributes);
-        mHasAudioFocus = false;
-
-        for (IRadioCallback callback : mRadioTunerCallbacks) {
-            try {
-                callback.onRadioMuteChanged(true);
-            } catch (RemoteException e) {
-                Log.e(TAG, "abandonAudioFocus(); onRadioMutechanged() notify failed: "
-                        + e.getMessage());
             }
         }
     }
@@ -252,7 +219,7 @@ public class RadioService extends MediaBrowserServiceCompat
             Log.d(TAG, "close()");
         }
 
-        abandonAudioFocus();
+        mAudioStreamController.requestMuted(true);
 
         if (mProgramList != null) {
             mProgramList.close();
@@ -264,35 +231,6 @@ public class RadioService extends MediaBrowserServiceCompat
         }
     }
 
-    @Override
-    public void onAudioFocusChange(int focusChange) {
-        if (Log.isLoggable(TAG, Log.DEBUG)) {
-            Log.d(TAG, "focus change: " + focusChange);
-        }
-
-        switch (focusChange) {
-            case AudioManager.AUDIOFOCUS_GAIN:
-                mHasAudioFocus = true;
-                openRadioBandInternal(mCurrentRadioBand);
-                break;
-
-            // For a transient loss, just allow the focus to be released. The radio will stop
-            // itself automatically. There is no need for an explicit abandon audio focus call
-            // because this removes the AudioFocusChangeListener.
-            case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT:
-            case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK:
-                mHasAudioFocus = false;
-                break;
-
-            case AudioManager.AUDIOFOCUS_LOSS:
-                close();
-                break;
-
-            default:
-                // Do nothing for all other cases.
-        }
-    }
-
     private IRadioManager.Stub mBinder = new IRadioManager.Stub() {
         /**
          * Tunes the radio to the given frequency. To be notified of a successful tune, register
@@ -300,12 +238,13 @@ public class RadioService extends MediaBrowserServiceCompat
          */
         @Override
         public void tune(ProgramSelector sel) {
-            if (mRadioManager == null || sel == null
-                    || requestAudioFocus() != AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
-                return;
-            }
-
+            if (!mAudioStreamController.preparePlayback(Optional.empty())) return;
             mRadioTuner.tune(sel);
+        }
+
+        @Override
+        public List<ProgramInfo> getProgramList() {
+            return mRadioTuner.getDynamicProgramList(null).toList();
         }
 
         /**
@@ -314,10 +253,7 @@ public class RadioService extends MediaBrowserServiceCompat
          */
         @Override
         public void seekForward() {
-            if (mRadioManager == null
-                    || requestAudioFocus() != AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
-                return;
-            }
+            if (!mAudioStreamController.preparePlayback(Optional.of(true))) return;
 
             if (mRadioTuner == null) {
                 int radioStatus = openRadioBandInternal(mCurrentRadioBand);
@@ -335,10 +271,7 @@ public class RadioService extends MediaBrowserServiceCompat
          */
         @Override
         public void seekBackward() {
-            if (mRadioManager == null
-                    || requestAudioFocus() != AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
-                return;
-            }
+            if (!mAudioStreamController.preparePlayback(Optional.of(false))) return;
 
             if (mRadioTuner == null) {
                 int radioStatus = openRadioBandInternal(mCurrentRadioBand);
@@ -350,20 +283,6 @@ public class RadioService extends MediaBrowserServiceCompat
             mRadioTuner.scan(RadioTuner.DIRECTION_DOWN, true);
         }
 
-        private boolean setMuted(boolean mute) {
-            if (!mRadioManager.getRadioTunerExt().setMuted(mute)) return false;
-
-            for (IRadioCallback callback : mRadioTunerCallbacks) {
-                try {
-                    callback.onRadioMuteChanged(mute);
-                } catch (RemoteException e) {
-                    Log.e(TAG, "onRadioMuteChanged callback failed", e);
-                }
-            }
-
-            return true;
-        }
-
         /**
          * Mutes the radio.
          *
@@ -371,7 +290,7 @@ public class RadioService extends MediaBrowserServiceCompat
          */
         @Override
         public boolean mute() {
-            return setMuted(true);
+            return mAudioStreamController.requestMuted(true);
         }
 
         /**
@@ -381,9 +300,7 @@ public class RadioService extends MediaBrowserServiceCompat
          */
         @Override
         public boolean unMute() {
-            if (!setMuted(false)) return false;
-
-            return requestAudioFocus() == AudioManager.AUDIOFOCUS_REQUEST_GRANTED;
+            return mAudioStreamController.requestMuted(false);
         }
 
         /**
@@ -391,7 +308,7 @@ public class RadioService extends MediaBrowserServiceCompat
          */
         @Override
         public boolean isMuted() {
-            return mRadioManager.getRadioTunerExt().isMuted();
+            return mAudioStreamController.isMuted();
         }
 
         @Override
@@ -489,6 +406,7 @@ public class RadioService extends MediaBrowserServiceCompat
 
             mCurrentProgram = Objects.requireNonNull(info);
             mMediaSession.notifyProgramInfoChanged(info);
+            mAudioStreamController.notifyProgramInfoChanged();
 
             for (IRadioCallback callback : mRadioTunerCallbacks) {
                 try {
@@ -571,12 +489,31 @@ public class RadioService extends MediaBrowserServiceCompat
 
     @Override
     public BrowserRoot onGetRoot(String clientPackageName, int clientUid, Bundle rootHints) {
-        // TODO(b/75970985): check permissions, if necessary
+        /* Radio application may restrict who can read its MediaBrowser tree.
+         * Our implementation doesn't.
+         */
         return mBrowseTree.getRoot();
     }
 
     @Override
     public void onLoadChildren(final String parentMediaId, final Result<List<MediaItem>> result) {
         mBrowseTree.loadChildren(parentMediaId, result);
+    }
+
+    @Override
+    public int onStartCommand(Intent intent, int flags, int startId) {
+        if (BrowseTree.ACTION_PLAY_BROADCASTRADIO.equals(intent.getAction())) {
+            Log.i(TAG, "Executing general play radio intent");
+            mMediaSession.getController().getTransportControls().playFromMediaId(
+                    mBrowseTree.getRoot().getRootId(), null);
+            return START_NOT_STICKY;
+        }
+
+        return super.onStartCommand(intent, flags, startId);
+    }
+
+    @Override
+    public IBinder asBinder() {
+        throw new UnsupportedOperationException("Not a binder");
     }
 }
