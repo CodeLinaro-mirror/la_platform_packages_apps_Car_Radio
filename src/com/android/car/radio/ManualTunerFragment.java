@@ -1,11 +1,11 @@
 /*
- * Copyright (c) 2016, The Android Open Source Project
+ * Copyright (C) 2018 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -13,88 +13,61 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.android.car.radio;
 
-import android.annotation.Nullable;
 import android.hardware.radio.ProgramSelector;
-import android.hardware.radio.RadioManager;
+import android.hardware.radio.RadioManager.ProgramInfo;
 import android.os.Bundle;
-import android.support.v4.app.Fragment;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 
-/**
- * A fragment that allows the user to manually input a radio station to tune to.
- */
-public class ManualTunerFragment extends Fragment implements
-        ManualTunerController.ManualTunerClickListener {
-    public static final String RADIO_BAND_ARG = "radio_band_arg";
+import androidx.annotation.NonNull;
+import androidx.fragment.app.Fragment;
 
-    private static final int DEFAULT_RADIO_BAND = RadioManager.BAND_FM;
+import com.android.car.radio.bands.ProgramType;
+import com.android.car.radio.widget.BandToggleButton;
+
+/**
+ * Fragment that allows tuning to a specific frequency using a keypad
+ */
+public class ManualTunerFragment extends Fragment {
 
     private ManualTunerController mController;
-    private ManualTunerCompletionListener mListener;
-
-    /**
-     * Interface for a class that will notified on completion of a manual tune.
-     */
-    public interface ManualTunerCompletionListener {
-        /**
-         * Called when the user has finished selected a radio station on the manual tuner. If the
-         * user exits the manual tuner without a station being selected, then {@code null} will
-         * be passed to this method.
-         *
-         * @param station The {@link ProgramSelector} that was selected or {@code null} if the user
-         *                exits before selecting one.
-         */
-        void onStationSelected(@Nullable ProgramSelector sel);
-    }
+    private RadioController mRadioController;
+    private BandToggleButton mBandToggleButton;
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
             Bundle savedInstanceState) {
-        View view = inflater.inflate(R.layout.manual_tuner, container, false);
+        View view = inflater.inflate(R.layout.tuner_fragment, container, false);
+        mController = new ManualTunerController(getContext(), view, ProgramType.FM);
+        mController.setDoneButtonListener(this::onManualTunerDone);
 
-        int radioBand = getArguments().getInt(RADIO_BAND_ARG, DEFAULT_RADIO_BAND);
+        mBandToggleButton = view.findViewById(R.id.manual_tuner_band_toggle);
+        mBandToggleButton.setCallback(mRadioController::switchBand);
 
-        mController = new ManualTunerController(getContext(), view, radioBand);
-        mController.setDoneButtonListener(this);
+        mRadioController.getCurrentProgram().observe(this, this::onCurrentProgramChanged);
 
         return view;
     }
 
-    /**
-     * Sets the listener that will be notified upon completion of manual tuning functions.
-     */
-    public void setManualTunerCompletionListener(ManualTunerCompletionListener listener) {
-        mListener = listener;
-    }
-
-    @Override
-    public void onBack() {
-       if (mListener != null) {
-           mListener.onStationSelected(null);
-       }
-    }
-
-    @Override
-    public void onDone(ProgramSelector sel) {
-        if (mListener != null) {
-            mListener.onStationSelected(sel);
+    private void onManualTunerDone(ProgramSelector sel) {
+        if (sel != null) {
+            mRadioController.tune(sel);
         }
     }
 
-    /**
-     * Creates a new {@link ManualTunerFragment} that is defaulted to the given radio band.
-     */
-    public static ManualTunerFragment newInstance(int radioBand) {
+    private void onCurrentProgramChanged(@NonNull ProgramInfo info) {
+        ProgramType pt = ProgramType.fromSelector(info.getSelector());
+        mBandToggleButton.setType(pt);
+        mController.setCurrentBand(pt);
+    }
+
+    static ManualTunerFragment newInstance(RadioController radioController) {
         ManualTunerFragment fragment = new ManualTunerFragment();
-
-        Bundle args = new Bundle();
-        args.putInt(RADIO_BAND_ARG, radioBand);
-        fragment.setArguments(args);
-
+        fragment.mRadioController = radioController;
         return fragment;
     }
 }
