@@ -22,7 +22,6 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 
-import androidx.car.widget.DayNightStyle;
 import androidx.car.widget.PagedListView;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.RecyclerView;
@@ -59,12 +58,19 @@ public class FavoritesFragment extends Fragment {
         mBrowseAdapter.setOnItemFavoriteListener(this::handlePresetItemFavoriteChanged);
 
         mBrowseList = view.findViewById(R.id.browse_list);
-        mBrowseList.setDayNightStyle(DayNightStyle.ALWAYS_LIGHT);
         mBrowseList.setAdapter(mBrowseAdapter);
         RecyclerView recyclerView = mBrowseList.getRecyclerView();
         recyclerView.setVerticalFadingEdgeEnabled(true);
         recyclerView.setFadingEdgeLength(getResources()
                 .getDimensionPixelSize(R.dimen.car_padding_4));
+    }
+
+    @Override
+    public void setUserVisibleHint(boolean isVisibleToUser) {
+        super.setUserVisibleHint(isVisibleToUser);
+        if (!isVisibleToUser && mBrowseAdapter != null) {
+            mBrowseAdapter.removeFormerFavorites();
+        }
     }
 
     private void handlePresetItemFavoriteChanged(Program program, boolean saveAsFavorite) {

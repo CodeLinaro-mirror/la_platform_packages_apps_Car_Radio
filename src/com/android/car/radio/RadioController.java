@@ -16,21 +16,20 @@
 
 package com.android.car.radio;
 
-import android.content.Context;
 import android.hardware.radio.ProgramSelector;
 import android.hardware.radio.RadioManager.ProgramInfo;
 import android.hardware.radio.RadioMetadata;
-import android.support.v4.media.session.PlaybackStateCompat;
+import android.media.session.PlaybackState;
 import android.view.View;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.fragment.app.FragmentActivity;
 import androidx.lifecycle.LiveData;
 
 import com.android.car.broadcastradio.support.Program;
 import com.android.car.broadcastradio.support.platform.ProgramInfoExt;
 import com.android.car.radio.bands.ProgramType;
+import com.android.car.radio.bands.RegionConfig;
 import com.android.car.radio.service.RadioAppService;
 import com.android.car.radio.service.RadioAppServiceWrapper;
 import com.android.car.radio.service.RadioAppServiceWrapper.ConnectionState;
@@ -47,7 +46,7 @@ public class RadioController {
     private static final String TAG = "BcRadioApp.controller";
 
     private final Object mLock = new Object();
-    private final Context mContext;
+    private final RadioActivity mActivity;
 
     private final RadioAppServiceWrapper mAppService = new RadioAppServiceWrapper();
     private final DisplayController mDisplayController;
@@ -55,8 +54,8 @@ public class RadioController {
 
     @Nullable private ProgramInfo mCurrentProgram;
 
-    public RadioController(@NonNull FragmentActivity activity) {
-        mContext = Objects.requireNonNull(activity);
+    public RadioController(@NonNull RadioActivity activity) {
+        mActivity = Objects.requireNonNull(activity);
 
         mDisplayController = new DisplayController(activity, this);
 
@@ -74,10 +73,9 @@ public class RadioController {
 
     private void onConnectionStateChanged(@ConnectionState int state) {
         mDisplayController.setState(state);
-        if (state == RadioAppServiceWrapper.STATE_CONNECTED
-                && !mAppService.isProgramListSupported()) {
-            // TODO(b/111354105): handle case where program list is not supported
-            Log.i(TAG, "Program list is not supported with the current hardware");
+        if (state == RadioAppServiceWrapper.STATE_CONNECTED) {
+            mActivity.setProgramListSupported(mAppService.isProgramListSupported());
+            mActivity.setSupportedProgramTypes(getRegionConfig().getSupportedProgramTypes());
         }
     }
 
@@ -85,7 +83,7 @@ public class RadioController {
      * Starts the controller and establishes connection with {@link RadioAppService}.
      */
     public void start() {
-        mAppService.bind(mContext);
+        mAppService.bind(mActivity);
     }
 
     /**
@@ -127,12 +125,24 @@ public class RadioController {
     }
 
     /**
+     * Steps the radio tuner in the given direction, see {@link RadioAppServiceWrapper#step}.
+     */
+    public void step(boolean forward) {
+        mAppService.step(forward);
+    }
+
+    /**
      * Switch radio band. Currently, this only supports FM and AM bands.
      *
      * @param pt {@link ProgramType} to switch to.
      */
     public void switchBand(@NonNull ProgramType pt) {
         mAppService.switchBand(pt);
+    }
+
+    @NonNull
+    public RegionConfig getRegionConfig() {
+        return mAppService.getRegionConfig();
     }
 
     private void onFavoritesChanged(List<Program> favorites) {
@@ -177,13 +187,13 @@ public class RadioController {
         mAppService.seek(true);
     }
 
-    private void onSwitchToPlayState(@PlaybackStateCompat.State int newPlayState) {
+    private void onSwitchToPlayState(@PlaybackState.State int newPlayState) {
         switch (newPlayState) {
-            case PlaybackStateCompat.STATE_PLAYING:
+            case PlaybackState.STATE_PLAYING:
                 mAppService.setMuted(false);
                 break;
-            case PlaybackStateCompat.STATE_PAUSED:
-            case PlaybackStateCompat.STATE_STOPPED:
+            case PlaybackState.STATE_PAUSED:
+            case PlaybackState.STATE_STOPPED:
                 mAppService.setMuted(true);
                 break;
             default:

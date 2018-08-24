@@ -21,26 +21,26 @@ import static com.android.car.radio.util.Remote.tryExec;
 import android.content.Intent;
 import android.hardware.radio.ProgramList;
 import android.hardware.radio.ProgramSelector;
-import android.hardware.radio.RadioManager.BandDescriptor;
 import android.hardware.radio.RadioManager.ProgramInfo;
 import android.hardware.radio.RadioTuner;
+import android.media.browse.MediaBrowser.MediaItem;
+import android.media.session.PlaybackState;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.os.RemoteException;
 import android.os.SystemClock;
-import android.support.v4.media.MediaBrowserCompat.MediaItem;
-import android.support.v4.media.session.PlaybackStateCompat;
+import android.service.media.MediaBrowserService;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.lifecycle.Lifecycle;
 import androidx.lifecycle.LifecycleOwner;
 import androidx.lifecycle.LifecycleRegistry;
-import androidx.media.MediaBrowserServiceCompat;
 
 import com.android.car.broadcastradio.support.media.BrowseTree;
 import com.android.car.radio.audio.AudioStreamController;
 import com.android.car.radio.bands.ProgramType;
+import com.android.car.radio.bands.RegionConfig;
 import com.android.car.radio.media.TunerSession;
 import com.android.car.radio.platform.ImageMemoryCache;
 import com.android.car.radio.platform.RadioManagerExt;
@@ -57,7 +57,7 @@ import java.util.Objects;
 /**
  * A service handling hardware tuner session and audio streaming.
  */
-public class RadioAppService extends MediaBrowserServiceCompat implements LifecycleOwner {
+public class RadioAppService extends MediaBrowserService implements LifecycleOwner {
     private static final String TAG = "BcRadioApp.service";
 
     public static String ACTION_APP_SERVICE = "com.android.car.radio.ACTION_APP_SERVICE";
@@ -81,8 +81,10 @@ public class RadioAppService extends MediaBrowserServiceCompat implements Lifecy
 
     // current observables state for newly bound IRadioAppCallbacks
     private ProgramInfo mCurrentProgram = null;
-    private int mCurrentPlaybackState = PlaybackStateCompat.STATE_NONE;
+    private int mCurrentPlaybackState = PlaybackState.STATE_NONE;
     private long mLastProgramListPush;
+
+    private RegionConfig mRegionConfigCache;
 
     @Override
     public void onCreate() {
@@ -212,13 +214,13 @@ public class RadioAppService extends MediaBrowserServiceCompat implements Lifecy
             ProgramSelector sel = mRadioStorage.getRecentlySelected(pt);
             if (sel != null) {
                 Log.i(TAG, "Restoring recently selected program: " + sel);
-                mRadioTuner.tune(sel);
+                mRadioTuner.tune(sel, tuneCb);
                 return;
             }
 
             if (pt == null) pt = ProgramType.FM;
             Log.i(TAG, "No recently selected program set, selecting default channel for " + pt);
-            pt.tuneToDefault(mRadioTuner, mWrapper, tuneCb);
+            pt.tuneToDefault(mRadioTuner, mWrapper.getRegionConfig(), tuneCb);
         }
     }
 
@@ -308,6 +310,20 @@ public class RadioAppService extends MediaBrowserServiceCompat implements Lifecy
         }
 
         @Override
+        public void step(boolean forward, ITuneCallback callback) {
+            Objects.requireNonNull(callback);
+            synchronized (mLock) {
+                if (mRadioTuner == null) throw new IllegalStateException("Tuner session is closed");
+                TuneCallback tuneCb = mAudioStreamController.preparePlayback(forward
+                        ? AudioStreamController.OPERATION_STEP_FWD
+                        : AudioStreamController.OPERATION_STEP_BKW);
+                if (tuneCb == null) return;
+                mRadioTuner.step(forward, tuneCb.alsoCall(
+                        succ -> tryExec(() -> callback.onFinished(succ))));
+            }
+        }
+
+        @Override
         public void setMuted(boolean muted) {
             if (mAudioStreamController == null) return;
             if (muted) mRadioTuner.cancel();
@@ -325,8 +341,13 @@ public class RadioAppService extends MediaBrowserServiceCompat implements Lifecy
         }
 
         @Override
-        public List<BandDescriptor> getAmFmRegionConfig() {
-            return mRadioManager.getAmFmRegionConfig();
+        public RegionConfig getRegionConfig() {
+            synchronized (mLock) {
+                if (mRegionConfigCache == null) {
+                    mRegionConfigCache = new RegionConfig(mRadioManager.getAmFmRegionConfig());
+                }
+                return mRegionConfigCache;
+            }
         }
     };
 
