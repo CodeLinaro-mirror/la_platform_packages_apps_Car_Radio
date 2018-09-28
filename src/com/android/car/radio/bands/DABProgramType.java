@@ -16,12 +16,15 @@
 
 package com.android.car.radio.bands;
 
+import android.hardware.radio.ProgramSelector;
+
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.annotation.StringRes;
 
+import com.android.car.radio.R;
 import com.android.car.radio.platform.RadioTunerExt;
 import com.android.car.radio.platform.RadioTunerExt.TuneCallback;
-import com.android.car.radio.service.RadioAppServiceWrapper;
 import com.android.car.radio.util.Log;
 
 class DABProgramType extends ProgramType {
@@ -31,13 +34,39 @@ class DABProgramType extends ProgramType {
         super(id);
     }
 
+    @Override
     @NonNull
     public String getEnglishName() {
         return "DAB";
     }
 
-    public void tuneToDefault(@NonNull RadioTunerExt tuner,
-            @NonNull RadioAppServiceWrapper appService, @Nullable TuneCallback result) {
+    @Override
+    @StringRes
+    public int getLocalizedName() {
+        return R.string.programtype_dab_text;
+    }
+
+    @Override
+    public void tuneToDefault(@NonNull RadioTunerExt tuner, @NonNull RegionConfig config,
+            @Nullable TuneCallback result) {
         Log.e(TAG, "Tunning to a default DAB channel is not supported yet");
+    }
+
+    @Override
+    public boolean isComplete(@NonNull RegionConfig config, int leadingDigits) {
+        Log.e(TAG, "Manual entry of DAB channels is not supported");
+        return false;
+    }
+
+    @Override
+    @NonNull
+    public boolean[] getValidAppendices(@NonNull RegionConfig config, int leadingDigits) {
+        throw new UnsupportedOperationException("Manual entry of DAB channels is not supported");
+    }
+
+    @Override
+    @NonNull
+    public ProgramSelector parseDigits(int leadingDigits) {
+        throw new UnsupportedOperationException("Manual entry of DAB channels is not supported");
     }
 }

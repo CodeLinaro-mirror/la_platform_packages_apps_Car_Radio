@@ -164,13 +164,6 @@ public class RadioTunerExt {
     /**
      * See {@link RadioTuner#scan}.
      */
-    public void seek(boolean forward) {
-        seek(forward, null);
-    }
-
-    /**
-     * See {@link RadioTuner#scan}.
-     */
     public void seek(boolean forward, @Nullable TuneCallback resultCb) {
         synchronized (mTuneLock) {
             synchronized (mLock) {
@@ -188,10 +181,19 @@ public class RadioTunerExt {
     }
 
     /**
-     * See {@link RadioTuner#tune}.
+     * See {@link RadioTuner#step}.
      */
-    public void tune(@NonNull ProgramSelector selector) {
-        tune(selector, null);
+    public void step(boolean forward, @Nullable TuneCallback resultCb) {
+        synchronized (mTuneLock) {
+            markOperationFinishedLocked(false);
+            mOperationResultCb = resultCb;
+        }
+        mTuner.cancel();
+        int res =
+                mTuner.step(forward ? RadioTuner.DIRECTION_UP : RadioTuner.DIRECTION_DOWN, false);
+        if (res != RadioManager.STATUS_OK) {
+            throw new RuntimeException("Step failed with result of " + res);
+        }
     }
 
     /**

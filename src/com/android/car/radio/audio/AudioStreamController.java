@@ -20,7 +20,7 @@ import android.content.Context;
 import android.media.AudioAttributes;
 import android.media.AudioFocusRequest;
 import android.media.AudioManager;
-import android.support.v4.media.session.PlaybackStateCompat;
+import android.media.session.PlaybackState;
 
 import androidx.annotation.IntDef;
 import androidx.annotation.NonNull;
@@ -49,6 +49,12 @@ public class AudioStreamController {
     /** Seek backwards operation. */
     public static final int OPERATION_SEEK_BKW = 3;
 
+    /** Step forwards operation. */
+    public static final int OPERATION_STEP_FWD = 4;
+
+    /** Step backwards operation. */
+    public static final int OPERATION_STEP_BKW = 5;
+
     /**
      * Operation types for {@link #preparePlayback}.
      */
@@ -56,6 +62,8 @@ public class AudioStreamController {
         OPERATION_TUNE,
         OPERATION_SEEK_FWD,
         OPERATION_SEEK_BKW,
+        OPERATION_STEP_FWD,
+        OPERATION_STEP_BKW,
     })
     @Retention(RetentionPolicy.SOURCE)
     public @interface PlaybackOperation {}
@@ -74,7 +82,7 @@ public class AudioStreamController {
      */
     private boolean mHasSomeFocus = false;
 
-    private int mCurrentPlaybackState = PlaybackStateCompat.STATE_NONE;
+    private int mCurrentPlaybackState = PlaybackState.STATE_NONE;
     private Object mTuningToken;
 
     /**
@@ -188,13 +196,15 @@ public class AudioStreamController {
             int state;
             switch (operation) {
                 case OPERATION_TUNE:
-                    state = PlaybackStateCompat.STATE_CONNECTING;
+                    state = PlaybackState.STATE_CONNECTING;
                     break;
                 case OPERATION_SEEK_FWD:
-                    state = PlaybackStateCompat.STATE_SKIPPING_TO_NEXT;
+                case OPERATION_STEP_FWD:
+                    state = PlaybackState.STATE_SKIPPING_TO_NEXT;
                     break;
                 case OPERATION_SEEK_BKW:
-                    state = PlaybackStateCompat.STATE_SKIPPING_TO_PREVIOUS;
+                case OPERATION_STEP_BKW:
+                    state = PlaybackState.STATE_SKIPPING_TO_PREVIOUS;
                     break;
                 default:
                     throw new IllegalArgumentException("Invalid operation: " + operation);
@@ -210,7 +220,7 @@ public class AudioStreamController {
             if (mTuningToken != token) return;
             mTuningToken = null;
             notifyPlaybackStateLocked(succeeded
-                    ? PlaybackStateCompat.STATE_PLAYING : PlaybackStateCompat.STATE_ERROR);
+                    ? PlaybackState.STATE_PLAYING : PlaybackState.STATE_ERROR);
         }
     }
 
@@ -224,13 +234,13 @@ public class AudioStreamController {
         synchronized (mLock) {
             if (muted) {
                 if (mTuningToken == null) {
-                    notifyPlaybackStateLocked(PlaybackStateCompat.STATE_STOPPED);
+                    notifyPlaybackStateLocked(PlaybackState.STATE_STOPPED);
                 }
                 return abandonAudioFocusLocked();
             } else {
                 if (!requestAudioFocusLocked()) return false;
                 if (mTuningToken == null) {
-                    notifyPlaybackStateLocked(PlaybackStateCompat.STATE_PLAYING);
+                    notifyPlaybackStateLocked(PlaybackState.STATE_PLAYING);
                 }
                 return true;
             }
@@ -251,7 +261,7 @@ public class AudioStreamController {
                     Log.i(TAG, "Unexpected audio focus loss");
                     mHasSomeFocus = false;
                     mRadioTunerExt.setMuted(true);
-                    notifyPlaybackStateLocked(PlaybackStateCompat.STATE_STOPPED);
+                    notifyPlaybackStateLocked(PlaybackState.STATE_STOPPED);
                     break;
                 case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT:
                 case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK:

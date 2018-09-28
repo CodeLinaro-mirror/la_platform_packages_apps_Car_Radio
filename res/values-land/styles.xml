@@ -18,12 +18,13 @@ limitations under the License.
         <item name="android:clickable">true</item>
         <item name="android:layout_width">wrap_content</item>
         <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginBottom">@dimen/dialpad_space_vertical</item>
         <item name="android:gravity">center</item>
         <item name="android:layout_gravity">center</item>
         <item name="android:minWidth">@dimen/car_touch_target_size</item>
         <item name="android:minHeight">@dimen/car_touch_target_size</item>
         <item name="android:background">?android:attr/selectableItemBackground</item>
         <item name="android:focusable">true</item>
-        <item name="android:textColor">@color/manual_tuner_button_text</item>
+        <item name="android:textColor">@color/manual_tuner_digit_color</item>
     </style>
 </resources>

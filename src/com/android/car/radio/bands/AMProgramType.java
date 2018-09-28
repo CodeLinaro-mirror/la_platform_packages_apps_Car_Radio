@@ -17,14 +17,29 @@
 package com.android.car.radio.bands;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.StringRes;
+
+import com.android.car.radio.R;
 
 class AMProgramType extends AMFMProgramType {
     AMProgramType(@TypeId int id) {
         super(id);
     }
 
+    @Override
     @NonNull
     public String getEnglishName() {
         return "AM";
+    }
+
+    @Override
+    @StringRes
+    public int getLocalizedName() {
+        return R.string.programtype_am_text;
+    }
+
+    @Override
+    protected int getLeadingDigitsFactor() {
+        return 1;
     }
 }

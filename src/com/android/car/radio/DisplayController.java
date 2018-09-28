@@ -19,7 +19,7 @@ package com.android.car.radio;
 import android.animation.ValueAnimator;
 import android.content.Context;
 import android.hardware.radio.ProgramSelector;
-import android.support.v4.media.session.PlaybackStateCompat;
+import android.media.session.PlaybackState;
 import android.text.TextUtils;
 import android.view.View;
 import android.widget.ImageView;
@@ -86,17 +86,17 @@ public class DisplayController {
             @NonNull RadioController radioController) {
         mContext = Objects.requireNonNull(activity);
 
-        mTabs = activity.findViewById(R.id.radio_tabs);
+        mTabs = activity.findViewById(R.id.tabs);
         mViewpager = activity.findViewById(R.id.viewpager);
         mStatusMessage = activity.findViewById(R.id.status_message);
-        mChannel = activity.findViewById(R.id.radio_station_channel);
-        mDetails = activity.findViewById(R.id.radio_station_details);
-        mStationName = activity.findViewById(R.id.radio_station_name);
-        mBackwardSeekButton = activity.findViewById(R.id.radio_back_button);
-        mForwardSeekButton = activity.findViewById(R.id.radio_forward_button);
-        mPlayButton = activity.findViewById(R.id.radio_play_button);
+        mChannel = activity.findViewById(R.id.station_channel);
+        mDetails = activity.findViewById(R.id.station_details);
+        mStationName = activity.findViewById(R.id.station_name);
+        mBackwardSeekButton = activity.findViewById(R.id.back_button);
+        mForwardSeekButton = activity.findViewById(R.id.forward_button);
+        mPlayButton = activity.findViewById(R.id.play_button);
         mBandButton = activity.findViewById(R.id.band_toggle_button);
-        mFavoriteButton = activity.findViewById(R.id.radio_add_presets_button);
+        mFavoriteButton = activity.findViewById(R.id.add_presets_button);
 
         radioController.getPlaybackState().observe(activity, this::onPlaybackStateChanged);
 
@@ -125,8 +125,8 @@ public class DisplayController {
 
         // Color the buttons so that they are grey in appearance if they are disabled.
         int tint = enabled
-                ? mContext.getColor(R.color.car_radio_control_button)
-                : mContext.getColor(R.color.car_radio_control_button_disabled);
+                ? mContext.getColor(R.color.control_button)
+                : mContext.getColor(R.color.control_button_disabled);
 
         if (mPlayButton != null) {
             // No need to tint the play button because its drawable already contains a disabled
@@ -292,7 +292,7 @@ public class DisplayController {
         mStationName.setVisibility(isEmpty ? View.INVISIBLE : View.VISIBLE);
     }
 
-    private void onPlaybackStateChanged(@PlaybackStateCompat.State int state) {
+    private void onPlaybackStateChanged(@PlaybackState.State int state) {
         if (mPlayButton != null) {
             mPlayButton.setPlayState(state);
             mPlayButton.refreshDrawableState();

@@ -33,7 +33,7 @@ import java.util.Objects;
 
 /**
  * A {@link RecyclerView.ViewHolder} that can bind a {@link Program} to the layout
- * {@code R.layout.radio_preset_item}.
+ * {@code R.layout.radio_favorite_item}.
  */
 public class ProgramViewHolder extends RecyclerView.ViewHolder implements View.OnClickListener {
     private final OnPresetClickListener mPresetClickListener;
@@ -74,7 +74,7 @@ public class ProgramViewHolder extends RecyclerView.ViewHolder implements View.O
 
 
     /**
-     * @param presetsView A view that contains the layout {@code R.layout.radio_preset_item}.
+     * @param presetsView A view that contains the layout {@code R.layout.radio_favorite_item}.
      */
     public ProgramViewHolder(@NonNull View presetsView, @NonNull OnPresetClickListener listener,
             @NonNull OnPresetFavoriteListener favoriteListener) {
@@ -82,18 +82,18 @@ public class ProgramViewHolder extends RecyclerView.ViewHolder implements View.O
 
         mContext = presetsView.getContext();
 
-        mPresetsCard = presetsView.findViewById(R.id.preset_card);
+        mPresetsCard = presetsView.findViewById(R.id.favorite_card);
         mPresetsCard.setOnClickListener(this);
 
         mPresetClickListener = Objects.requireNonNull(listener);
         mPresetFavoriteListener = Objects.requireNonNull(favoriteListener);
 
-        mPresetItemChannel = presetsView.findViewById(R.id.preset_station_channel);
-        mPresetItemMetadata = presetsView.findViewById(R.id.preset_item_metadata);
-        mPresetButton = presetsView.findViewById(R.id.preset_button);
+        mPresetItemChannel = presetsView.findViewById(R.id.favorite_station_channel);
+        mPresetItemMetadata = presetsView.findViewById(R.id.favorite_item_metadata);
+        mPresetButton = presetsView.findViewById(R.id.favorite_button);
 
         mPresetItemChannelBg = (GradientDrawable)
-                presetsView.findViewById(R.id.preset_station_background).getBackground();
+                presetsView.findViewById(R.id.favorite_station_background).getBackground();
     }
 
     @Override
@@ -118,7 +118,7 @@ public class ProgramViewHolder extends RecyclerView.ViewHolder implements View.O
                 sel, ProgramSelectorExt.NAME_NO_MODULATION));
 
         mPresetItemChannelBg.setColor(mContext.getResources().getColor(isActiveStation
-                ? R.color.bigdog_accent_color
+                ? R.color.accent_color
                 : R.color.car_card_dark, null));
         mPresetItemChannel.setCompoundDrawablesRelativeWithIntrinsicBounds(isActiveStation
                 ? R.drawable.ic_equalizer
@@ -129,7 +129,7 @@ public class ProgramViewHolder extends RecyclerView.ViewHolder implements View.O
             // If there is no metadata text, then use text to indicate the favorite number to the
             // user so that list does not appear empty.
             mPresetItemMetadata.setText(mContext.getString(
-                    R.string.radio_default_preset_metadata_text, getAdapterPosition() + 1));
+                    R.string.radio_default_favorite_metadata_text, getAdapterPosition() + 1));
         } else {
             mPresetItemMetadata.setText(programName);
         }
@@ -150,7 +150,7 @@ public class ProgramViewHolder extends RecyclerView.ViewHolder implements View.O
                 ? R.drawable.ic_star_filled
                 : R.drawable.ic_star_empty);
         mPresetButton.setColorFilter(mContext.getColor(favoriteToggleOn
-                ? R.color.bigdog_accent_color
-                : R.color.car_radio_control_button));
+                ? R.color.accent_color
+                : R.color.control_button));
     }
 }
